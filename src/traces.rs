@@ -11,6 +11,8 @@ use tokio::sync::Mutex;
 use tonic::{codegen::*, Response};
 use crate::{fsync_benchmark, Writer};
 use opentelemetry_sdk::{propagation::TraceContextPropagator, trace as sdktrace};
+use opentelemetry_sdk::trace::BatchConfigBuilder;
+
 #[derive(Default)]
 pub struct TraceServer {}
 
@@ -64,10 +66,15 @@ pub fn init_tracer_otlp() -> Result<sdktrace::Tracer, TraceError> {
     let exporter = opentelemetry_otlp::new_exporter()
         .tonic()
         .with_endpoint("http://localhost:5081");
+    let batch_config = BatchConfigBuilder::default()
+        .with_max_queue_size(20480)   // 设置更大的缓冲区
+        .with_scheduled_delay(std::time::Duration::from_millis(1))
+        .build();
 
     opentelemetry_otlp::new_pipeline()
         .tracing()
         .with_exporter(exporter)
+        .with_batch_config(batch_config)
         .install_batch(opentelemetry_sdk::runtime::Tokio)
 }
 
