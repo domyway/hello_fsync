@@ -75,7 +75,7 @@ pub fn init_tracer_otlp() -> Result<sdktrace::Tracer, TraceError> {
         .tracing()
         .with_exporter(exporter)
         .with_batch_config(batch_config)
-        .install_batch(opentelemetry_sdk::runtime::Tokio)
+        .install_simple()
 }
 
 
