@@ -1,3 +1,5 @@
+mod traces;
+
 use anyhow::Result;
 use byteorder::{BigEndian, WriteBytesExt};
 use clap::{command, Parser};
@@ -6,6 +8,8 @@ use std::fs::{create_dir_all, remove_file, File, OpenOptions};
 use std::io::{BufWriter, Seek, SeekFrom, Write};
 use std::path::PathBuf;
 use std::sync::Arc;
+use std::time::Duration;
+use opentelemetry::global;
 use tokio::sync::Mutex;
 use tokio::task;
 
@@ -28,6 +32,10 @@ struct Args {
     /// Path to the test file
     #[arg(long, default_value = "/data/test_fsync_benchmark")]
     file_path: String,
+
+    /// use trace benchmark
+    #[arg(long, default_value = "n")]
+    trace: String,
 }
 
 async fn fsync_benchmark(
@@ -69,25 +77,50 @@ async fn main() {
     let init_size = 1024 * 1024 * 128; // 128 MB
     let buffer_size = 1024 * 16; // 16 KB
     let writer = Writer::new(file_path, init_size, buffer_size).expect("Failed to create writer");
-
-    let mut tasks = Vec::new();
-    let file_lock = Arc::new(Mutex::new(writer));
-    // Launch multiple tasks to perform fsync in parallel
-    for _ in 0..args.num_tasks {
-        let file_size = args.file_size;
-        let num_iterations = args.num_iterations;
-        let file_lock_clone = file_lock.clone();
-        let task = task::spawn(async move {
-            fsync_benchmark(file_lock_clone, file_size, num_iterations).await
-        });
-        tasks.push(task);
-    }
-
-    // Wait for all tasks to complete and gather total fsync times
     let total_time = 0u128;
-    for task in tasks {
-        _ = task.await.expect("Task failed");
+    if args.trace.eq("n") {
+        let mut tasks = Vec::new();
+        let file_lock = Arc::new(Mutex::new(writer));
+        // Launch multiple tasks to perform fsync in parallel
+        for _ in 0..args.num_tasks {
+            let file_size = args.file_size;
+            let num_iterations = args.num_iterations;
+            let file_lock_clone = file_lock.clone();
+            let task = task::spawn(async move {
+                fsync_benchmark(file_lock_clone, file_size, num_iterations).await
+            });
+            tasks.push(task);
+        }
+
+        // Wait for all tasks to complete and gather total fsync times
+        for task in tasks {
+            _ = task.await.expect("Task failed");
+        }
+    } else {
+        tokio::spawn(async {
+            let _ = crate::traces::init_common_grpc_server().await;
+        });
+
+        tokio::time::sleep(Duration::from_secs(1)).await;
+
+        let _ = crate::traces::init_tracer_otlp();
+        let _tracer = global::tracer("ex.com/basic");
+        for _ in 0..args.num_tasks {
+            let mut tasks = Vec::new();
+            // Launch multiple tasks to perform fsync in parallel
+            for _ in 0..args.num_iterations {
+                let task = task::spawn(async move {
+                    crate::traces::create_span_with_trace_id("d4d2f8a41ebd9810538d5bd72c520889").await;
+                });
+                tasks.push(task);
+            }
+            // Wait for all tasks to complete and gather total fsync times
+            for task in tasks {
+                _ = task.await.expect("Task failed");
+            }
+        }
     }
+
 
     println!(
         "Benchmark completed: Total time for all fsync operations = {} µs",

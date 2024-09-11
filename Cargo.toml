@@ -11,3 +11,24 @@ clap = { version = "4.1", default-features = false, features = ["std", "help", "
 crc32fast = "1.4.2"
 snap = "1.1.1"
 tokio = { version = "1", features = ["full"] }
+async-trait = "0.1"
+tonic = { version = "0.11", features = ["prost", "gzip"] }
+opentelemetry = "0.22"
+opentelemetry_sdk = { version = "0.22", features = [
+    "rt-tokio",
+    "trace",
+    "metrics",
+] }
+opentelemetry-otlp = { version = "0.15", features = [
+    "http-proto",
+    "serialize",
+    "serde",
+    "reqwest-client",
+] }
+opentelemetry-proto = { version = "0.5", features = [
+    "gen-tonic",
+    "serde",
+    "logs",
+    "metrics",
+    "trace",
+] }
