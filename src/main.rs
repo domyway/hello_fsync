@@ -8,7 +8,6 @@ use std::fs::{create_dir_all, remove_file, File, OpenOptions};
 use std::io::{BufWriter, Seek, SeekFrom, Write};
 use std::path::PathBuf;
 use std::sync::Arc;
-use std::time::Duration;
 use opentelemetry::global;
 use tokio::sync::Mutex;
 use tokio::task;
@@ -97,28 +96,35 @@ async fn main() {
             _ = task.await.expect("Task failed");
         }
     } else {
-        tokio::spawn(async {
+        let server_task = tokio::spawn(async {
             let _ = crate::traces::init_common_grpc_server().await;
         });
 
-        tokio::time::sleep(Duration::from_secs(1)).await;
-
-        let _ = crate::traces::init_tracer_otlp();
-        let _tracer = global::tracer("ex.com/basic");
-        for _ in 0..args.num_tasks {
-            let mut tasks = Vec::new();
-            // Launch multiple tasks to perform fsync in parallel
-            for _ in 0..args.num_iterations {
-                let task = task::spawn(async move {
-                    crate::traces::create_span_with_trace_id("d4d2f8a41ebd9810538d5bd72c520889").await;
-                });
-                tasks.push(task);
+        let benchmark_task = tokio::spawn(async move {
+            let _ = crate::traces::init_tracer_otlp();
+            let _tracer = global::tracer("ex.com/basic");
+            for i in 0..args.num_tasks {
+                let mut tasks = Vec::new();
+                // Launch multiple tasks to perform fsync in parallel
+                for _ in 0..args.num_iterations {
+                    let task = task::spawn(async move {
+                        crate::traces::create_span_with_trace_id("d4d2f8a41ebd9810538d5bd72c520889").await;
+                    });
+                    tasks.push(task);
+                }
+                // Wait for all tasks to complete and gather total fsync times
+                for task in tasks {
+                    _ = task.await.expect("Task failed");
+                }
+                println!("start service num_tasks {i}");
             }
-            // Wait for all tasks to complete and gather total fsync times
-            for task in tasks {
-                _ = task.await.expect("Task failed");
-            }
-        }
+        });
+        println!("start service bench");
+        // 等待服务和压测任务
+        let _ = tokio::try_join!(server_task, benchmark_task);
+        println!("end service bench");
+        // 确保所有 trace 数据都被导出
+        global::shutdown_tracer_provider();
     }
 
 
