@@ -141,7 +141,8 @@ async fn main() {
             let mut t = tokio::time::interval(Duration::from_secs(1));
             loop {
                 t.tick().await;
-                println!("counter: {}", crate::traces::COUNTER.load(SeqCst))
+                let c = crate::traces::COUNTER.load(SeqCst);
+                println!("counter: {c}")
             }
         });
         let _ = crate::traces::init_common_grpc_server().await;
