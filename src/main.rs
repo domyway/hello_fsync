@@ -40,6 +40,8 @@ struct Args {
     client: String,
     #[arg(long, default_value_t = 120)]
     client_time: usize,
+    #[arg(long, default_value = "")]
+    server_ip: String,
     #[arg(long, default_value = "n")]
     local: String,
 }
@@ -105,7 +107,7 @@ async fn main() {
 
     if args.client.eq("y") {
         let benchmark_task = tokio::spawn(async move {
-            let _ = crate::traces::init_tracer_otlp().unwrap();
+            let _ = crate::traces::init_tracer_otlp(args.server_ip).unwrap();
             let _tracer = global::tracer("fsync_benchmark");
             for i in 0..args.num_tasks {
                 let mut tasks = Vec::new();
