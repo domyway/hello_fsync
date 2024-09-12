@@ -4,12 +4,12 @@ use anyhow::Result;
 use byteorder::{BigEndian, WriteBytesExt};
 use clap::{command, Parser};
 use crc32fast::Hasher;
+use opentelemetry::global;
 use std::fs::{create_dir_all, remove_file, File, OpenOptions};
 use std::io::{BufWriter, Seek, SeekFrom, Write};
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
-use opentelemetry::global;
 use tokio::sync::Mutex;
 use tokio::{task, try_join};
 
@@ -85,7 +85,8 @@ async fn main() {
 
         let init_size = 1024 * 1024 * 128; // 128 MB
         let buffer_size = 1024 * 16; // 16 KB
-        let writer = Writer::new(file_path, init_size, buffer_size).expect("Failed to create writer");
+        let writer =
+            Writer::new(file_path, init_size, buffer_size).expect("Failed to create writer");
         let mut tasks = Vec::new();
         let file_lock = Arc::new(Mutex::new(writer));
         // Launch multiple tasks to perform fsync in parallel
@@ -109,20 +110,24 @@ async fn main() {
         let benchmark_task = tokio::spawn(async move {
             let _ = crate::traces::init_tracer_otlp(args.server_ip).unwrap();
             let _tracer = global::tracer("fsync_benchmark");
+            let mut tasks = Vec::new();
             for i in 0..args.num_tasks {
-                let mut tasks = Vec::new();
                 // Launch multiple tasks to perform fsync in parallel
-                for _ in 0..args.num_iterations {
-                    let task = task::spawn(async move {
-                        crate::traces::create_span_with_trace_id("d4d2f8a41ebd9810538d5bd72c520889").await;
-                    });
-                    tasks.push(task);
-                }
+                let task = task::spawn(async move {
+                    for _ in 0..args.num_iterations {
+                        crate::traces::create_span_with_trace_id(
+                            "d4d2f8a41ebd9810538d5bd72c520889",
+                        )
+                        .await;
+                    }
+                });
+                tasks.push(task);
                 // Wait for all tasks to complete and gather total fsync times
-                for task in tasks {
-                    _ = task.await.expect("Task failed");
-                }
                 println!("start service num_tasks {i}");
+            }
+
+            for task in tasks {
+                _ = task.await.expect("Task failed");
             }
         });
 
@@ -130,12 +135,11 @@ async fn main() {
         tokio::time::sleep(Duration::from_secs(args.client_time as u64)).await;
     }
 
-    if args.server.eq("y"){
+    if args.server.eq("y") {
         let _ = crate::traces::init_common_grpc_server().await;
         // 确保所有 trace 数据都被导出
         global::shutdown_tracer_provider();
     }
-
 
     println!(
         "Benchmark completed: Total time for all fsync operations = {} µs",

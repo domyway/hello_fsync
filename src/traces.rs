@@ -1,17 +1,17 @@
-use std::fs::remove_file;
-use std::net::SocketAddr;
-use opentelemetry::{global, Key};
+use crate::{fsync_benchmark, Writer};
 use opentelemetry::trace::{Span, TraceError, Tracer};
+use opentelemetry::{global, Key};
 use opentelemetry_otlp::WithExportConfig;
+use opentelemetry_proto::tonic::collector::trace::v1::trace_service_server::TraceServiceServer;
 use opentelemetry_proto::tonic::collector::trace::v1::{
     trace_service_server::TraceService, ExportTraceServiceRequest, ExportTraceServiceResponse,
 };
-use opentelemetry_proto::tonic::collector::trace::v1::trace_service_server::TraceServiceServer;
+use opentelemetry_sdk::trace::BatchConfigBuilder;
+use opentelemetry_sdk::{propagation::TraceContextPropagator, trace as sdktrace};
+use std::fs::remove_file;
+use std::net::SocketAddr;
 use tokio::sync::Mutex;
 use tonic::{codegen::*, Response};
-use crate::{fsync_benchmark, Writer};
-use opentelemetry_sdk::{propagation::TraceContextPropagator, trace as sdktrace};
-use opentelemetry_sdk::trace::BatchConfigBuilder;
 
 #[derive(Default)]
 pub struct TraceServer {}
@@ -29,19 +29,20 @@ impl TraceService for TraceServer {
         //     remove_file(&file_path).expect("Failed to delete file");
         // }
         let init_size = 1024 * 1024 * 128; // 128 MB
-        let buffer_size = 1024 * 16 * 4; // 16 KB
-        let writer = Writer::new("/tmp/test_fsync_benchmark", init_size, buffer_size).expect("Failed to create writer");
-
+        let buffer_size = 1024 * 4; // 4 KB
+        let writer = Writer::new("/tmp/test_fsync_benchmark", init_size, buffer_size)
+            .expect("Failed to create writer");
 
         let file_lock = Arc::new(Mutex::new(writer));
-        fsync_benchmark(file_lock, 4 * 1024, 1).await.expect("benchmark failed");
+        fsync_benchmark(file_lock, 4 * 1024 * 16, 1)
+            .await
+            .expect("benchmark failed");
 
         Ok(Response::new(ExportTraceServiceResponse {
             partial_success: None,
         }))
     }
 }
-
 
 pub async fn init_common_grpc_server() -> Result<(), anyhow::Error> {
     let ip = "0.0.0.0".to_string();
@@ -60,7 +61,6 @@ pub async fn init_common_grpc_server() -> Result<(), anyhow::Error> {
     Ok(())
 }
 
-
 pub fn init_tracer_otlp(server_ip: String) -> Result<sdktrace::Tracer, TraceError> {
     // Start a new jaeger trace pipeline
     global::set_text_map_propagator(TraceContextPropagator::new());
@@ -68,7 +68,7 @@ pub fn init_tracer_otlp(server_ip: String) -> Result<sdktrace::Tracer, TraceErro
         .tonic()
         .with_endpoint(server_ip);
     let batch_config = BatchConfigBuilder::default()
-        .with_max_queue_size(20480)   // 设置更大的缓冲区
+        .with_max_queue_size(20480) // 设置更大的缓冲区
         .with_scheduled_delay(std::time::Duration::from_millis(1))
         .build();
 
@@ -78,7 +78,6 @@ pub fn init_tracer_otlp(server_ip: String) -> Result<sdktrace::Tracer, TraceErro
         .with_batch_config(batch_config)
         .install_simple()
 }
-
 
 pub async fn create_span_with_trace_id(trace_id: &str) {
     let tracer = global::tracer("example-tracer");
