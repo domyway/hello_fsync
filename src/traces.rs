@@ -33,7 +33,7 @@ impl TraceService for TraceServer {
             .expect("Failed to create writer");
 
         let file_lock = Arc::new(Mutex::new(writer));
-        for _ in 0..100 {
+        for _ in 0..10000 {
             fsync_benchmark(file_lock.clone(), 4 * 1024 * 16, 1)
                 .await
                 .expect("benchmark failed");
