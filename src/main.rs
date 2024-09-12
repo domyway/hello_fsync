@@ -8,9 +8,10 @@ use std::fs::{create_dir_all, remove_file, File, OpenOptions};
 use std::io::{BufWriter, Seek, SeekFrom, Write};
 use std::path::PathBuf;
 use std::sync::Arc;
+use std::time::Duration;
 use opentelemetry::global;
 use tokio::sync::Mutex;
-use tokio::task;
+use tokio::{task, try_join};
 
 /// Struct to parse command-line arguments
 #[derive(Parser, Debug)]
@@ -34,7 +35,13 @@ struct Args {
 
     /// use trace benchmark
     #[arg(long, default_value = "n")]
-    trace: String,
+    server: String,
+    #[arg(long, default_value = "n")]
+    client: String,
+    #[arg(long, default_value_t = 120)]
+    client_time: usize,
+    #[arg(long, default_value = "n")]
+    local: String,
 }
 
 async fn fsync_benchmark(
@@ -66,18 +73,17 @@ async fn fsync_benchmark(
 async fn main() {
     // Parse command-line arguments
     let args = Args::parse();
-
-    let file_path = args.file_path;
-    // delete the file if it already exists
-    if std::path::Path::new(&file_path).exists() {
-        remove_file(&file_path).expect("Failed to delete file");
-    }
-
-    let init_size = 1024 * 1024 * 128; // 128 MB
-    let buffer_size = 1024 * 16; // 16 KB
-    let writer = Writer::new(file_path, init_size, buffer_size).expect("Failed to create writer");
     let total_time = 0u128;
-    if args.trace.eq("n") {
+    if args.local.eq("y") {
+        let file_path = args.file_path;
+        // delete the file if it already exists
+        if std::path::Path::new(&file_path).exists() {
+            remove_file(&file_path).expect("Failed to delete file");
+        }
+
+        let init_size = 1024 * 1024 * 128; // 128 MB
+        let buffer_size = 1024 * 16; // 16 KB
+        let writer = Writer::new(file_path, init_size, buffer_size).expect("Failed to create writer");
         let mut tasks = Vec::new();
         let file_lock = Arc::new(Mutex::new(writer));
         // Launch multiple tasks to perform fsync in parallel
@@ -95,14 +101,12 @@ async fn main() {
         for task in tasks {
             _ = task.await.expect("Task failed");
         }
-    } else {
-        let server_task = tokio::spawn(async {
-            let _ = crate::traces::init_common_grpc_server().await;
-        });
+    }
 
+    if args.client.eq("y") {
         let benchmark_task = tokio::spawn(async move {
-            let _ = crate::traces::init_tracer_otlp();
-            let _tracer = global::tracer("ex.com/basic");
+            let _ = crate::traces::init_tracer_otlp().unwrap();
+            let _tracer = global::tracer("fsync_benchmark");
             for i in 0..args.num_tasks {
                 let mut tasks = Vec::new();
                 // Launch multiple tasks to perform fsync in parallel
@@ -119,10 +123,13 @@ async fn main() {
                 println!("start service num_tasks {i}");
             }
         });
-        println!("start service bench");
-        // 等待服务和压测任务
-        let _ = tokio::try_join!(server_task, benchmark_task);
-        println!("end service bench");
+
+        try_join!(benchmark_task).expect("benchmark_task Failed");
+        tokio::time::sleep(Duration::from_secs(args.client_time as u64)).await;
+    }
+
+    if args.server.eq("y"){
+        let _ = crate::traces::init_common_grpc_server().await;
         // 确保所有 trace 数据都被导出
         global::shutdown_tracer_provider();
     }

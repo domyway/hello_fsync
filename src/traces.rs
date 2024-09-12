@@ -22,7 +22,8 @@ impl TraceService for TraceServer {
         &self,
         _: tonic::Request<ExportTraceServiceRequest>,
     ) -> Result<tonic::Response<ExportTraceServiceResponse>, tonic::Status> {
-        let file_path = "/data/test_fsync_benchmark";
+        // println!("export here");
+        let file_path = "/tmp/test_fsync_benchmark";
         // delete the file if it already exists
         if std::path::Path::new(&file_path).exists() {
             remove_file(&file_path).expect("Failed to delete file");
