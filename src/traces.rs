@@ -17,8 +17,8 @@ use once_cell::sync::Lazy;
 
 #[derive(Default)]
 pub struct TraceServer {}
-pub const COUNTER : Lazy<Arc<AtomicI64>> = Lazy::new(||{
-    Arc::new(AtomicI64::new(0))
+pub const COUNTER : Lazy<AtomicI64> = Lazy::new(||{
+    AtomicI64::new(0)
 });
 
 #[async_trait]
