@@ -29,7 +29,7 @@ impl TraceService for TraceServer {
             remove_file(&file_path).expect("Failed to delete file");
         }
         let init_size = 1024 * 1024 * 128; // 128 MB
-        let buffer_size = 1024 * 16; // 16 KB
+        let buffer_size = 1024 * 16 * 4; // 16 KB
         let writer = Writer::new(file_path, init_size, buffer_size).expect("Failed to create writer");
 
 
