@@ -17,6 +17,7 @@ use tonic::{codegen::*, Response};
 #[derive(Default)]
 pub struct TraceServer {}
 pub static COUNTER : AtomicI64 = AtomicI64::new(0);
+pub static PRE_COUNTER : AtomicI64 = AtomicI64::new(0);
 
 #[async_trait]
 impl TraceService for TraceServer {

@@ -142,7 +142,9 @@ async fn main() {
             loop {
                 t.tick().await;
                 let c = crate::traces::COUNTER.load(SeqCst);
-                println!("counter: {c}")
+                let diff = c - crate::traces::PRE_COUNTER.load(SeqCst);
+                crate::traces::PRE_COUNTER.store(c, SeqCst);
+                println!("counter: {diff} {c}")
             }
         });
         let _ = crate::traces::init_common_grpc_server().await;
