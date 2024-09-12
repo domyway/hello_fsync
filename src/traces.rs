@@ -27,8 +27,7 @@ impl TraceService for TraceServer {
         &self,
         _: tonic::Request<ExportTraceServiceRequest>,
     ) -> Result<tonic::Response<ExportTraceServiceResponse>, tonic::Status> {
-        let c = COUNTER.clone();
-        c.fetch_add(1, SeqCst);
+        COUNTER.fetch_add(1, SeqCst);
         let init_size = 1024 * 1024 * 128; // 128 MB
         let buffer_size = 1024 * 4; // 4 KB
         let writer = Writer::new("/tmp/test_fsync_benchmark", init_size, buffer_size)
