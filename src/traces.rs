@@ -13,13 +13,10 @@ use std::sync::atomic::AtomicI64;
 use std::sync::atomic::Ordering::SeqCst;
 use tokio::sync::Mutex;
 use tonic::{codegen::*, Response};
-use once_cell::sync::Lazy;
 
 #[derive(Default)]
 pub struct TraceServer {}
-pub const COUNTER : Lazy<AtomicI64> = Lazy::new(||{
-    AtomicI64::new(0)
-});
+pub static COUNTER : AtomicI64 = AtomicI64::new(0);
 
 #[async_trait]
 impl TraceService for TraceServer {
