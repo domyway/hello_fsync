@@ -17,8 +17,8 @@ use once_cell::sync::Lazy;
 
 #[derive(Default)]
 pub struct TraceServer {}
-pub const COUNTER : Lazy<Arc<Mutex<AtomicI64>>> = Lazy::new(||{
-    Arc::new(Mutex::new(AtomicI64::new(0)))
+pub const COUNTER : Lazy<Arc<AtomicI64>> = Lazy::new(||{
+    Arc::new(AtomicI64::new(0))
 });
 
 #[async_trait]
@@ -27,7 +27,8 @@ impl TraceService for TraceServer {
         &self,
         _: tonic::Request<ExportTraceServiceRequest>,
     ) -> Result<tonic::Response<ExportTraceServiceResponse>, tonic::Status> {
-
+        let c = COUNTER.clone();
+        c.fetch_add(1, SeqCst);
         let init_size = 1024 * 1024 * 128; // 128 MB
         let buffer_size = 1024 * 4; // 4 KB
         let writer = Writer::new("/tmp/test_fsync_benchmark", init_size, buffer_size)
@@ -40,8 +41,8 @@ impl TraceService for TraceServer {
                 .expect("benchmark failed");
         }
 
-        let c = COUNTER.clone();
-        c.lock().await.fetch_add(1, SeqCst);
+
+
         Ok(Response::new(ExportTraceServiceResponse {
             partial_success: None,
         }))

@@ -142,7 +142,7 @@ async fn main() {
             loop {
                 t.tick().await;
                 let c = crate::traces::COUNTER.clone();
-                println!("counter: {}", c.lock().await.load(SeqCst))
+                println!("counter: {}", c.load(SeqCst))
             }
         });
         let _ = crate::traces::init_common_grpc_server().await;
