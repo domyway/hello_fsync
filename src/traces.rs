@@ -30,9 +30,9 @@ impl TraceService for TraceServer {
         let buffer_size = 1024 * 4; // 4 KB
         let writer = Writer::new("/tmp/test_fsync_benchmark", init_size, buffer_size)
             .expect("Failed to create writer");
-
         let file_lock = Arc::new(Mutex::new(writer));
         for _ in 0..100 {
+	    tokio::time::sleep(std::time::Duration::from_millis(5)).await;
             fsync_benchmark(file_lock.clone(), 4 * 1024 * 16 * 20, 1)
                 .await
                 .expect("benchmark failed");
