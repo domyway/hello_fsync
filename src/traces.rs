@@ -8,7 +8,6 @@ use opentelemetry_proto::tonic::collector::trace::v1::{
 };
 use opentelemetry_sdk::trace::BatchConfigBuilder;
 use opentelemetry_sdk::{propagation::TraceContextPropagator, trace as sdktrace};
-use std::fs::remove_file;
 use std::net::SocketAddr;
 use tokio::sync::Mutex;
 use tonic::{codegen::*, Response};
@@ -34,9 +33,12 @@ impl TraceService for TraceServer {
             .expect("Failed to create writer");
 
         let file_lock = Arc::new(Mutex::new(writer));
-        fsync_benchmark(file_lock, 4 * 1024 * 16, 1)
-            .await
-            .expect("benchmark failed");
+        for _ in 0..100 {
+            fsync_benchmark(file_lock.clone(), 4 * 1024 * 16, 1)
+                .await
+                .expect("benchmark failed");
+        }
+
 
         Ok(Response::new(ExportTraceServiceResponse {
             partial_success: None,
