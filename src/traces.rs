@@ -23,14 +23,14 @@ impl TraceService for TraceServer {
         _: tonic::Request<ExportTraceServiceRequest>,
     ) -> Result<tonic::Response<ExportTraceServiceResponse>, tonic::Status> {
         // println!("export here");
-        let file_path = "/tmp/test_fsync_benchmark";
-        // delete the file if it already exists
-        if std::path::Path::new(&file_path).exists() {
-            remove_file(&file_path).expect("Failed to delete file");
-        }
+        // let file_path = "/tmp/test_fsync_benchmark";
+        // // delete the file if it already exists
+        // if std::path::Path::new(&file_path).exists() {
+        //     remove_file(&file_path).expect("Failed to delete file");
+        // }
         let init_size = 1024 * 1024 * 128; // 128 MB
         let buffer_size = 1024 * 16 * 4; // 16 KB
-        let writer = Writer::new(file_path, init_size, buffer_size).expect("Failed to create writer");
+        let writer = Writer::new("/tmp/test_fsync_benchmark", init_size, buffer_size).expect("Failed to create writer");
 
 
         let file_lock = Arc::new(Mutex::new(writer));
