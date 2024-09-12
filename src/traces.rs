@@ -9,11 +9,17 @@ use opentelemetry_proto::tonic::collector::trace::v1::{
 use opentelemetry_sdk::trace::BatchConfigBuilder;
 use opentelemetry_sdk::{propagation::TraceContextPropagator, trace as sdktrace};
 use std::net::SocketAddr;
+use std::sync::atomic::AtomicI64;
+use std::sync::atomic::Ordering::SeqCst;
 use tokio::sync::Mutex;
 use tonic::{codegen::*, Response};
+use once_cell::sync::Lazy;
 
 #[derive(Default)]
 pub struct TraceServer {}
+pub const COUNTER : Lazy<Arc<Mutex<AtomicI64>>> = Lazy::new(||{
+    Arc::new(Mutex::new(AtomicI64::new(0)))
+});
 
 #[async_trait]
 impl TraceService for TraceServer {
@@ -21,25 +27,21 @@ impl TraceService for TraceServer {
         &self,
         _: tonic::Request<ExportTraceServiceRequest>,
     ) -> Result<tonic::Response<ExportTraceServiceResponse>, tonic::Status> {
-        // println!("export here");
-        // let file_path = "/tmp/test_fsync_benchmark";
-        // // delete the file if it already exists
-        // if std::path::Path::new(&file_path).exists() {
-        //     remove_file(&file_path).expect("Failed to delete file");
-        // }
+
         let init_size = 1024 * 1024 * 128; // 128 MB
         let buffer_size = 1024 * 4; // 4 KB
         let writer = Writer::new("/tmp/test_fsync_benchmark", init_size, buffer_size)
             .expect("Failed to create writer");
 
         let file_lock = Arc::new(Mutex::new(writer));
-        for _ in 0..10000 {
-            fsync_benchmark(file_lock.clone(), 4 * 1024 * 16, 1)
+        for _ in 0..100 {
+            fsync_benchmark(file_lock.clone(), 4 * 1024 * 16 * 20, 1)
                 .await
                 .expect("benchmark failed");
         }
 
-
+        let c = COUNTER.clone();
+        c.lock().await.fetch_add(1, SeqCst);
         Ok(Response::new(ExportTraceServiceResponse {
             partial_success: None,
         }))
@@ -70,7 +72,7 @@ pub fn init_tracer_otlp(server_ip: String) -> Result<sdktrace::Tracer, TraceErro
         .tonic()
         .with_endpoint(server_ip);
     let batch_config = BatchConfigBuilder::default()
-        .with_max_queue_size(20480) // 设置更大的缓冲区
+        .with_max_queue_size(20480)
         .with_scheduled_delay(std::time::Duration::from_millis(1))
         .build();
 

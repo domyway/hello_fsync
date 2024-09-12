@@ -32,3 +32,4 @@ opentelemetry-proto = { version = "0.5", features = [
     "metrics",
     "trace",
 ] }
+once_cell = "1.19.0"

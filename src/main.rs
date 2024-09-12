@@ -9,6 +9,7 @@ use std::fs::{create_dir_all, remove_file, File, OpenOptions};
 use std::io::{BufWriter, Seek, SeekFrom, Write};
 use std::path::PathBuf;
 use std::sync::Arc;
+use std::sync::atomic::Ordering::SeqCst;
 use std::time::Duration;
 use tokio::sync::Mutex;
 use tokio::{task, try_join};
@@ -136,6 +137,14 @@ async fn main() {
     }
 
     if args.server.eq("y") {
+        tokio::spawn(async {
+            let mut t = tokio::time::interval(Duration::from_secs(1));
+            loop {
+                t.tick().await;
+                let c = crate::traces::COUNTER.clone();
+                println!("counter: {}", c.lock().await.load(SeqCst))
+            }
+        });
         let _ = crate::traces::init_common_grpc_server().await;
         // 确保所有 trace 数据都被导出
         global::shutdown_tracer_provider();
