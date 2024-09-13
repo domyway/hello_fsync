@@ -67,12 +67,14 @@ pub fn init_tracer_otlp(server_ip: String) -> Result<sdktrace::Tracer, TraceErro
     // Start a new jaeger trace pipeline
     global::set_text_map_propagator(TraceContextPropagator::new());
     let mut metadata = tonic::metadata::MetadataMap::new();
+    // root@example.com:Complexpass#123
     metadata.insert(
         "authorization",
         "Basic cm9vdEBleGFtcGxlLmNvbTpDb21wbGV4cGFzcyMxMjM="
             .parse()
             .unwrap(),
     );
+    metadata.insert("organization", "default".parse().unwrap());
     let exporter = opentelemetry_otlp::new_exporter()
         .tonic()
         .with_metadata(metadata)
