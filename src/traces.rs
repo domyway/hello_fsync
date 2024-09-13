@@ -66,8 +66,16 @@ pub async fn init_common_grpc_server() -> Result<(), anyhow::Error> {
 pub fn init_tracer_otlp(server_ip: String) -> Result<sdktrace::Tracer, TraceError> {
     // Start a new jaeger trace pipeline
     global::set_text_map_propagator(TraceContextPropagator::new());
+    let mut metadata = tonic::metadata::MetadataMap::new();
+    metadata.insert(
+        "authorization",
+        "Basic cm9vdEBleGFtcGxlLmNvbTpDb21wbGV4cGFzcyMxMjM="
+            .parse()
+            .unwrap(),
+    );
     let exporter = opentelemetry_otlp::new_exporter()
         .tonic()
+        .with_metadata(metadata)
         .with_endpoint(server_ip);
     let batch_config = BatchConfigBuilder::default()
         .with_max_queue_size(20480)
