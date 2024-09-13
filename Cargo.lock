@@ -457,6 +457,7 @@ dependencies = [
  "opentelemetry-otlp",
  "opentelemetry-proto",
  "opentelemetry_sdk",
+ "rand",
  "snap",
  "tokio",
  "tonic",

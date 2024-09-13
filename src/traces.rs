@@ -8,6 +8,7 @@ use opentelemetry_proto::tonic::collector::trace::v1::{
 };
 use opentelemetry_sdk::trace::BatchConfigBuilder;
 use opentelemetry_sdk::{propagation::TraceContextPropagator, trace as sdktrace};
+use rand::Rng;
 use std::net::SocketAddr;
 use std::sync::atomic::AtomicI64;
 use std::sync::atomic::Ordering::SeqCst;
@@ -16,8 +17,8 @@ use tonic::{codegen::*, Response};
 
 #[derive(Default)]
 pub struct TraceServer {}
-pub static COUNTER : AtomicI64 = AtomicI64::new(0);
-pub static PRE_COUNTER : AtomicI64 = AtomicI64::new(0);
+pub static COUNTER: AtomicI64 = AtomicI64::new(0);
+pub static PRE_COUNTER: AtomicI64 = AtomicI64::new(0);
 
 #[async_trait]
 impl TraceService for TraceServer {
@@ -37,8 +38,6 @@ impl TraceService for TraceServer {
                 .await
                 .expect("benchmark failed");
         }
-
-
 
         Ok(Response::new(ExportTraceServiceResponse {
             partial_success: None,
@@ -100,10 +99,17 @@ pub async fn create_span_with_trace_id(trace_id: &str) {
         .with_trace_id(opentelemetry::trace::TraceId::from_hex(trace_id).unwrap()) // Parse trace ID
         .start(&tracer);
     // Add attributes, events, or other span operations
-    span.add_event(
-        "Nice operation!".to_string(),
-        vec![Key::new("bogons").i64(100)],
-    );
+    for _ in 0..10000 {
+        let random_string: String = rand::thread_rng()
+            .sample_iter(&rand::distributions::Alphanumeric)
+            .take(10)
+            .map(char::from)
+            .collect();
+        span.add_event(
+            "Nice operation!".to_string(),
+            vec![Key::new("bogons").string(random_string)],
+        );
+    }
 
     // Optionally, end the span
     span.end();
