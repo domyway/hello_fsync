@@ -99,7 +99,7 @@ pub async fn create_span_with_trace_id(trace_id: &str) {
         .with_trace_id(opentelemetry::trace::TraceId::from_hex(trace_id).unwrap()) // Parse trace ID
         .start(&tracer);
     // Add attributes, events, or other span operations
-    for _ in 0..100 {
+    for _ in 0..10 {
         let random_string: String = rand::thread_rng()
             .sample_iter(&rand::distributions::Alphanumeric)
             .take(10)
